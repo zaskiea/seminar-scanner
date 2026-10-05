@@ -1,0 +1,576 @@
+<!DOCTYPE html>
+<html lang="id">
+
+<head>
+
+  <meta charset="UTF-8">
+
+  <meta
+    name="viewport"
+    content="width=device-width, initial-scale=1"
+  >
+
+  <title>Scanner Absensi Seminar</title>
+
+  <script src="https://unpkg.com/html5-qrcode"></script>
+
+  <style>
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      padding: 20px;
+      font-family: Arial, sans-serif;
+      background: #f5f5f5;
+      color: #222;
+    }
+
+    .container {
+      max-width: 500px;
+      margin: auto;
+    }
+
+    .card {
+      background: white;
+      padding: 25px;
+      border-radius: 18px;
+      box-shadow: 0 4px 20px rgba(0,0,0,.08);
+    }
+
+    h1 {
+      text-align: center;
+      margin-top: 0;
+    }
+
+    .subtitle {
+      text-align: center;
+      color: #666;
+      margin-bottom: 25px;
+    }
+
+    label {
+      display: block;
+      font-weight: bold;
+      margin-bottom: 8px;
+    }
+
+    input {
+      width: 100%;
+      padding: 14px;
+      border: 1px solid #ddd;
+      border-radius: 10px;
+      font-size: 16px;
+      margin-bottom: 15px;
+    }
+
+    button {
+      width: 100%;
+      padding: 14px;
+      border: none;
+      border-radius: 10px;
+      font-size: 16px;
+      font-weight: bold;
+      cursor: pointer;
+    }
+
+    .start {
+      background: #222;
+      color: white;
+    }
+
+    .stop {
+      background: #ddd;
+      color: #222;
+      margin-top: 10px;
+    }
+
+    #reader {
+      width: 100%;
+      margin-top: 20px;
+    }
+
+    #result {
+      margin-top: 20px;
+      padding: 15px;
+      border-radius: 12px;
+      text-align: center;
+      display: none;
+      line-height: 1.5;
+    }
+
+    .success {
+      background: #e8f7ec;
+      color: #176b2c;
+    }
+
+    .error {
+      background: #fff0f0;
+      color: #b42318;
+    }
+
+    .warning {
+      background: #fff8e1;
+      color: #8a5a00;
+    }
+
+    .hidden {
+      display: none;
+    }
+
+  </style>
+
+</head>
+
+<body>
+
+<div class="container">
+
+  <div class="card">
+
+    <h1>📷 Scanner Absensi</h1>
+
+    <p class="subtitle">
+      Khusus Panitia Seminar
+    </p>
+
+
+    <div id="loginSection">
+
+      <label>
+        PIN Panitia
+      </label>
+
+      <input
+        type="password"
+        id="pin"
+        placeholder="Masukkan PIN panitia"
+        autocomplete="off"
+      >
+
+      <button
+        class="start"
+        onclick="startScanner()"
+      >
+        Mulai Scanner
+      </button>
+
+    </div>
+
+
+    <div id="scannerSection" class="hidden">
+
+      <div id="reader"></div>
+
+      <button
+        class="stop"
+        onclick="stopScanner()"
+      >
+        Tutup Scanner
+      </button>
+
+    </div>
+
+
+    <div id="result"></div>
+
+  </div>
+
+</div>
+
+
+<script>
+
+  // =====================================================
+  // URL APPS SCRIPT KAMU
+  // =====================================================
+
+  const API_URL =
+    "https://script.google.com/macros/s/AKfycbxinMhyy8gycZo0FCdFD0mLWkX8mVC1bbhKrty64nfMSfGnIb3Tg4kpzfPMRhEHzEc7CA/exec";
+
+
+  let scanner = null;
+
+  let currentPin = "";
+
+  let processing = false;
+
+
+  // =====================================================
+  // MULAI SCANNER
+  // =====================================================
+
+  function startScanner() {
+
+    const pin =
+      document
+        .getElementById("pin")
+        .value
+        .trim();
+
+
+    if (!pin) {
+
+      showResult(
+        "Masukkan PIN panitia terlebih dahulu.",
+        "error"
+      );
+
+      return;
+    }
+
+
+    currentPin = pin;
+
+
+    document
+      .getElementById("loginSection")
+      .classList
+      .add("hidden");
+
+
+    document
+      .getElementById("scannerSection")
+      .classList
+      .remove("hidden");
+
+
+    scanner =
+      new Html5Qrcode("reader");
+
+
+    scanner.start(
+
+      {
+        facingMode: "environment"
+      },
+
+      {
+        fps: 10,
+
+        qrbox: {
+          width: 250,
+          height: 250
+        }
+
+      },
+
+      function(decodedText) {
+
+        handleScan(decodedText);
+
+      },
+
+      function(errorMessage) {
+
+        // Abaikan error scan sementara
+
+      }
+
+    )
+
+    .then(function() {
+
+      showResult(
+        "Scanner siap. Arahkan kamera ke QR peserta.",
+        "warning"
+      );
+
+    })
+
+    .catch(function(error) {
+
+      console.error(error);
+
+      showResult(
+        "❌ Kamera tidak dapat dibuka.<br><br>" +
+        "Pastikan izin kamera diberikan.",
+        "error"
+      );
+
+    });
+
+  }
+
+
+  // =====================================================
+  // QR TERBACA
+  // =====================================================
+
+  function handleScan(decodedText) {
+
+    if (processing) {
+      return;
+    }
+
+
+    processing = true;
+
+
+    let idPeserta = "";
+
+
+    try {
+
+      const url =
+        new URL(decodedText);
+
+      idPeserta =
+        url.searchParams.get("id");
+
+    } catch (error) {
+
+      idPeserta =
+        decodedText.trim();
+
+    }
+
+
+    if (!idPeserta) {
+
+      processing = false;
+
+      showResult(
+        "❌ QR Code tidak valid.",
+        "error"
+      );
+
+      return;
+    }
+
+
+    stopCamera();
+
+
+    showResult(
+      "⏳ Memproses " +
+      idPeserta +
+      "...",
+      "warning"
+    );
+
+
+    /*
+     * Kirim data ke Apps Script.
+     */
+
+    const body =
+      new URLSearchParams();
+
+
+    body.append(
+      "action",
+      "attendance"
+    );
+
+    body.append(
+      "id",
+      idPeserta
+    );
+
+    body.append(
+      "pin",
+      currentPin
+    );
+
+
+    fetch(
+      API_URL,
+      {
+        method: "POST",
+
+        body: body
+      }
+    )
+
+    .then(function(response) {
+
+      return response.json();
+
+    })
+
+    .then(function(result) {
+
+      handleResult(result);
+
+    })
+
+    .catch(function(error) {
+
+      console.error(error);
+
+      processing = false;
+
+      showResult(
+        "❌ Gagal terhubung ke sistem.<br><br>" +
+        "Coba scan ulang.",
+        "error"
+      );
+
+    });
+
+  }
+
+
+  // =====================================================
+  // HASIL ABSENSI
+  // =====================================================
+
+  function handleResult(result) {
+
+    processing = false;
+
+
+    if (!result) {
+
+      showResult(
+        "❌ Tidak ada respons dari server.",
+        "error"
+      );
+
+      return;
+    }
+
+
+    if (result.success) {
+
+      showResult(
+        "✅ ABSENSI BERHASIL<br><br>" +
+        "<b>" +
+        result.nama +
+        "</b><br>" +
+        "ID: " +
+        result.id,
+        "success"
+      );
+
+      return;
+    }
+
+
+    if (result.type === "already") {
+
+      showResult(
+        "⚠️ PESERTA SUDAH ABSEN<br><br>" +
+        "ID: " +
+        result.id,
+        "warning"
+      );
+
+      return;
+    }
+
+
+    if (result.type === "pin") {
+
+      showResult(
+        "❌ PIN PANITIA SALAH",
+        "error"
+      );
+
+      return;
+    }
+
+
+    if (result.type === "notfound") {
+
+      showResult(
+        "❌ ID PESERTA TIDAK DITEMUKAN",
+        "error"
+      );
+
+      return;
+    }
+
+
+    showResult(
+      "❌ " +
+      (result.message || "Terjadi kesalahan."),
+      "error"
+    );
+
+  }
+
+
+  // =====================================================
+  // STOP KAMERA
+  // =====================================================
+
+  function stopCamera() {
+
+    if (!scanner) {
+      return;
+    }
+
+
+    scanner
+      .stop()
+      .catch(function(error) {
+
+        console.log(error);
+
+      });
+
+  }
+
+
+  // =====================================================
+  // TUTUP SCANNER
+  // =====================================================
+
+  function stopScanner() {
+
+    stopCamera();
+
+
+    document
+      .getElementById("scannerSection")
+      .classList
+      .add("hidden");
+
+
+    document
+      .getElementById("loginSection")
+      .classList
+      .remove("hidden");
+
+
+    document
+      .getElementById("pin")
+      .value = "";
+
+
+    currentPin = "";
+
+    processing = false;
+
+  }
+
+
+  // =====================================================
+  // PESAN
+  // =====================================================
+
+  function showResult(message, type) {
+
+    const result =
+      document.getElementById("result");
+
+
+    result.innerHTML = message;
+
+    result.className = "";
+
+    result.classList.add(type);
+
+    result.style.display = "block";
+
+  }
+
+</script>
+
+</body>
+
+</html>
